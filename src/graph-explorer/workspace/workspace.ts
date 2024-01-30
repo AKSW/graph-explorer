@@ -34,6 +34,7 @@ import {
 } from '../diagram/view';
 
 import { AsyncModel, GroupBy } from '../editor/asyncModel';
+import { SerializedDiagram } from '../editor/serializedDiagram';
 import { AuthoringState } from '../editor/authoringState';
 import { EditorController, PropertyEditor } from '../editor/editorController';
 
@@ -48,13 +49,25 @@ import { DefaultToolbar, ToolbarProps } from './toolbar';
 import { WorkspaceMarkup, WorkspaceMarkupProps } from './workspaceMarkup';
 import { WorkspaceEventHandler, WorkspaceEventKey } from './workspaceContext';
 import { forceLayout, applyLayout } from '../viewUtils/layout';
+import { SparqlDataProvider } from '../data/sparql/sparqlDataProvider';
 
 const GRAPH_EXPLORER_WEBSITE = 'https://graph-explorer.org/';
 const GRAPH_EXPLORER_LOGO_SVG: string | undefined = undefined;
 
+function saveLayoutToLocalStorage(diagram: SerializedDiagram): string {
+  const randomKey = Math.floor((1 + Math.random()) * 0x10000000000)
+    .toString(16)
+    .substring(1);
+  localStorage.setItem(randomKey, JSON.stringify(diagram));
+  return randomKey;
+}
+
 export interface WorkspaceProps {
   /** Saves diagram layout (position and state of elements and links). */
   onSaveDiagram?: (workspace: Workspace) => void;
+  onDownloadSource?: (workspace: Workspace) => void;
+  onUploadSource?: (workspace: Workspace) => void;
+  onReloadClassTree?: (workspace: Workspace) => void;
   /** Persists authored changes in the editor. */
   onPersistChanges?: (workspace: Workspace) => void;
   onPointerDown?: (e: PointerEvent) => void;
@@ -157,7 +170,79 @@ export class Workspace extends Component<WorkspaceProps, WorkspaceState> {
       { code: 'ru', label: 'Russian' },
     ],
     language: 'en',
+    onSaveDiagram: (workspace) => {
+      const diagram = workspace.getModel().exportLayout();
+      window.location.hash = saveLayoutToLocalStorage(diagram);
+      fetch(
+        'https://diagramstore.aksw.org', {
+          method: 'POST',
+          body: JSON.stringify(diagram)
+        })
+        .then((res) => res.json())
+        .then((json) => {
+          window.location.hash = '!' + json.data.frag;
+        })
+        .finally(() => {
+          window.location.reload();
+        });
+    },
+    onDownloadSource: (workspace) => {
+      const fileName = prompt("diagram name", workspace.fileName ?? "Ontodia Diagram");
+      const diagram = workspace.getModel().exportLayout();
+      const blobData = new Blob([ JSON.stringify(diagram, null, 2) ], { type: 'application/ld+json' });
+      const urlToBlob = window.URL.createObjectURL(blobData);
+      if (!fileName) return;
+      if (fileName !== "Ontodia Diagram") {
+        workspace.fileName = fileName;
+      }
+
+      const a = document.createElement('a');
+      a.style.setProperty('display', 'none');
+      document.body.appendChild(a);
+      a.href = urlToBlob;
+      a.download = `${fileName}.json`;
+      a.click();
+      window.URL.revokeObjectURL(urlToBlob);
+      a.remove();
+    },
+    onUploadSource: (workspace) => {
+      const input = document.createElement('input');
+      input.style.setProperty('display', 'none');
+      input.accept = 'application/json';
+      input.type = 'file';
+      input.addEventListener('change', () => {
+        if (input.files.length) {
+          const file = input.files[0];
+          file.text()
+            .then((text) => {
+              const diagram = JSON.parse(text);
+              workspace.getModel().importLayout({
+                diagram,
+                validateLinks: true,
+                dataProvider: workspace.getModel().dataProvider
+              });
+              workspace.fileName = file.name.replace(/\.json$/, '').replace(/\(\d+\)$/, '').trim();
+            })
+            .catch((error) => {
+              alert(`Could not load diagram: ${error}`);
+            });
+        }
+      });
+      input.click();
+      input.remove();
+    },
+    onReloadClassTree: (workspace) => {
+      const provider = workspace.getModel().dataProvider;
+      if (provider instanceof SparqlDataProvider) {
+        const endpointUrl = provider.options.endpointUrl;
+        localStorage.removeItem(`classTree#${endpointUrl}`);
+        const diagram = workspace.getModel().exportLayout();
+        window.location.hash = saveLayoutToLocalStorage(diagram);
+        window.location.reload();
+      }
+    },
   };
+  fileName?: string;
 
   private readonly listener = new EventObserver();
 
@@ -299,8 +384,8 @@ export class Workspace extends Component<WorkspaceProps, WorkspaceState> {
 
     this.listener.listen(this.markup.paperArea.events, 'pointerUp', (e) => {
       this.lastMousePosition = this.markup.paperArea.pageToPaperCoords(
-	e.sourceEvent.pageX,
-	e.sourceEvent.pageY
+        e.sourceEvent.pageX,
+        e.sourceEvent.pageY
       );
       if (this.props.onPointerUp) {
         this.props.onPointerUp(e);
@@ -313,8 +398,8 @@ export class Workspace extends Component<WorkspaceProps, WorkspaceState> {
     });
     this.listener.listen(this.markup.paperArea.events, 'pointerDown', (e) => {
       this.lastMousePosition = this.markup.paperArea.pageToPaperCoords(
-	e.sourceEvent.pageX,
-	e.sourceEvent.pageY
+        e.sourceEvent.pageX,
+        e.sourceEvent.pageY
       );
       if (this.props.onPointerDown) {
         this.props.onPointerDown(e);
@@ -524,6 +609,9 @@ class ToolbarWrapper extends Component<ToolbarWrapperProps, {}> {
     const {
       languages,
       onSaveDiagram,
+      onDownloadSource,
+      onUploadSource,
+      onReloadClassTree,
       onPersistChanges,
       hidePanels,
       toolbar,
@@ -543,6 +631,9 @@ class ToolbarWrapper extends Component<ToolbarWrapperProps, {}> {
       onExportPNG: workspace.exportPng,
       canSaveDiagram,
       onSaveDiagram: onSaveDiagram ? () => onSaveDiagram(workspace) : undefined,
+      onDownloadSource: onDownloadSource ? () => onDownloadSource(workspace) : undefined,
+      onUploadSource: onUploadSource ? () => onUploadSource(workspace) : undefined,
+      onReloadClassTree: onReloadClassTree ? () => onReloadClassTree(workspace) : undefined,
       canPersistChanges,
       onPersistChanges: onPersistChanges
         ? () => onPersistChanges(workspace)

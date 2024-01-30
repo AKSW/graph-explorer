@@ -15,6 +15,8 @@ export interface ToolbarProps {
   onExportSVG?: (fileName?: string) => void;
   onExportPNG?: (fileName?: string) => void;
   onPrint?: () => void;
+  onDownloadSource?: () => void;
+  onUploadSource?: () => void;
   languages?: ReadonlyArray<WorkspaceLanguage>;
   selectedLanguage?: string;
   onChangeLanguage?: (language: string) => void;
@@ -46,11 +48,11 @@ export class DefaultToolbar extends React.Component<ToolbarProps, {}> {
     return (
       <button
         type="button"
-        className="saveDiagramButton graph-explorer-btn graph-explorer-btn-primary"
+        className="saveDiagramButton graph-explorer-btn graph-explorer-btn-default"
         disabled={this.props.canSaveDiagram === false}
         onClick={this.props.onSaveDiagram}
       >
-        <span className="fa fa-floppy-o" aria-hidden="true" /> Save diagram
+        <span className="fa fa-cloud-upload" aria-hidden="true" /> Save diagram
       </button>
     );
   }
@@ -100,6 +102,22 @@ export class DefaultToolbar extends React.Component<ToolbarProps, {}> {
       <div className={CLASS_NAME}>
         <div className="graph-explorer-btn-group graph-explorer-btn-group-sm">
           {this.renderSaveDiagramButton()}
+          <button
+            type="button"
+            className="graph-explorer-btn graph-explorer-btn-default"
+            title="Download diagram source"
+            onClick={this.props.onDownloadSource}
+          >
+            <span className="fa fa-download" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className="graph-explorer-btn graph-explorer-btn-default"
+            title="Open diagram source"
+            onClick={this.props.onUploadSource}
+          >
+            <span className="fa fa-folder-open-o" aria-hidden="true" />
+          </button>
           {this.renderPersistAuthoredChangesButton()}
           {this.props.onClearAll ? (
             <button
@@ -144,7 +162,7 @@ export class DefaultToolbar extends React.Component<ToolbarProps, {}> {
           >
             <span className="fa fa-arrows-alt" aria-hidden="true" />
           </button>
-	{/*
+        {/*
           <button
             type="button"
             className="graph-explorer-btn graph-explorer-btn-default"
@@ -169,7 +187,7 @@ export class DefaultToolbar extends React.Component<ToolbarProps, {}> {
           >
             <span className="fa fa-print" aria-hidden="true" />
           </button>
-	 */}
+         */}
           <button
             type="button"
             className="graph-explorer-btn graph-explorer-btn-default"
@@ -178,6 +196,9 @@ export class DefaultToolbar extends React.Component<ToolbarProps, {}> {
           >
             <span className="fa fa-print" aria-hidden="true" />
           </button>
+          <span className="graph-explorer-toolbar__layout-group">
+            &nbsp;
+          </span>
           {this.renderLanguages()}
         </div>
       </div>

@@ -16,9 +16,7 @@ import {
 
 import {
   onPageLoad,
-  tryLoadLayoutFromLocalStorage,
-  tryLoadFromNamedResources,
-  saveLayoutToLocalStorage,
+  loadDiagram,
 } from './common';
 
 const CoyPuSettings: SparqlDataProviderSettings = {
@@ -44,19 +42,19 @@ PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
            OPTIONAL { ?class rdfs:label ?label } .
            OPTIONAL { ?class rdfs:subClassOf ?parent_ . filter(!isblank(?parent_)) . } .
            BIND(coalesce(?parent_, if(contains(str(?class),"/meta"), owl:MetaThing, owl:Thing)) AS ?parent) .
-	 } UNION {
-	   ?class a skos:Concept ;
-	          skos:inScheme ?scheme .
+         } UNION {
+           ?class a skos:Concept ;
+                  skos:inScheme ?scheme .
            OPTIONAL { ?class skos:prefLabel ?label } .
            OPTIONAL { ?class skos:broader ?parent_ . filter(!isblank(?parent_)) . } .
-	   BIND(coalesce(?parent_, ?scheme) AS ?parent) .
-	 } UNION {
-	   { SELECT ?class SAMPLE(?label) {
-	       [] skos:inScheme ?class .
-	       OPTIONAL { ?class skos:prefLabel|rdfs:label ?label }
-	     } GROUP BY ?class } .
-	   BIND(skos:ConceptScheme AS ?parent) .
-	 }
+           BIND(coalesce(?parent_, ?scheme) AS ?parent) .
+         } UNION {
+           { SELECT ?class SAMPLE(?label) {
+               [] skos:inScheme ?class .
+               OPTIONAL { ?class skos:prefLabel|rdfs:label ?label }
+             } GROUP BY ?class } .
+           BIND(skos:ConceptScheme AS ?parent) .
+         }
        }`
   },
 };
@@ -99,45 +97,11 @@ function onWorkspaceMounted(workspace: Workspace) {
     }
   );
 
-  const localDiagram = tryLoadLayoutFromLocalStorage();
-  let next;
-  if (!localDiagram && window.location.hash.length > 2 && window.location.hash.slice(0, 2) === '#!') {
-    const remote = window.location.hash.slice(2);
-    next = fetch('https://diagramstore.aksw.org/' + remote)
-      .then((res) => res.json());
-  } else {
-    next = Promise.resolve(localDiagram);
-  }
-  next.then((diagram) => {
-    workspace.getModel().importLayout({
-      diagram,
-      validateLinks: true,
-      dataProvider
-    });
-    if (!diagram) {
-      tryLoadFromNamedResources(workspace);
-    }
-  });
+  loadDiagram(workspace, dataProvider);
 }
 
 const props: WorkspaceProps & ClassAttributes<Workspace> = {
   ref: onWorkspaceMounted,
-  onSaveDiagram: (workspace) => {
-    const diagram = workspace.getModel().exportLayout();
-    window.location.hash = saveLayoutToLocalStorage(diagram);
-    fetch(
-      'https://diagramstore.aksw.org', {
-	method: 'POST',
-	body: JSON.stringify(diagram)
-      })
-      .then((res) => res.json())
-      .then((json) => {
-	window.location.hash = '!' + json.data.frag;
-      })
-      .finally(() => {
-	window.location.reload();
-      });
-  },
   viewOptions: {
     onIriClick: ({ iri }) => window.open(iri),
   },
