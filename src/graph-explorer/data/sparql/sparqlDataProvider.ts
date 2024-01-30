@@ -170,6 +170,11 @@ export class SparqlDataProvider implements DataProvider {
       return [];
     }
 
+    const endpointUrl = this.options.endpointUrl;
+    const cachedTree = localStorage.getItem(`classTree#${endpointUrl}`);
+    if (cachedTree) {
+      return JSON.parse(cachedTree);
+    }
     const query =
       defaultPrefix +
       resolveTemplate(classTreeQuery, {
@@ -185,6 +190,7 @@ export class SparqlDataProvider implements DataProvider {
       );
     }
 
+    localStorage.setItem(`classTree#${endpointUrl}`, JSON.stringify(classTree));
     return classTree;
   }
 

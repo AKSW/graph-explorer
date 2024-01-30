@@ -17,6 +17,7 @@ export interface ToolbarProps {
   onPrint?: () => void;
   onDownloadSource?: () => void;
   onUploadSource?: () => void;
+  onReloadClassTree?: () => void;
   languages?: ReadonlyArray<WorkspaceLanguage>;
   selectedLanguage?: string;
   onChangeLanguage?: (language: string) => void;
@@ -101,6 +102,17 @@ export class DefaultToolbar extends React.Component<ToolbarProps, {}> {
     return (
       <div className={CLASS_NAME}>
         <div className="graph-explorer-btn-group graph-explorer-btn-group-sm">
+          <button
+            type="button"
+            className="graph-explorer-btn graph-explorer-btn-default"
+            title="Reload Classes Tree"
+            onClick={this.props.onReloadClassTree}
+          >
+            <span className="fa fa-refresh" aria-hidden="true" /> Classes
+          </button>
+          <span className="graph-explorer-toolbar__layout-group">
+            &nbsp;
+          </span>
           {this.renderSaveDiagramButton()}
           <button
             type="button"
